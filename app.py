@@ -287,7 +287,7 @@ with st.sidebar:
 
     st.markdown("")
     run_clicked = st.button("▶ Run Simulation", type="primary", use_container_width=True)
-    st.caption("Monte Carlo · Gaussian scatter · Rayleigh distribution")
+    st.caption("Monte Carlo · tetrahedral contact physics · mixture distribution")
 
 # ---------------------------------------------------------------------------
 # Run simulation on button press
@@ -317,7 +317,7 @@ st.markdown(
     f"<strong style='color:{TEXT}'>{drop_height_in} in</strong>, "
     f"repeat <strong style='color:{TEXT}'>{n_replicates:,}</strong> times on a "
     f"<strong style='color:{TEXT}'>{table_size_in}×{table_size_in} in</strong> table. "
-    f"Scatter emerges from fall physics · radial distances follow a Rayleigh distribution · "
+    f"Scatter emerges from fall &amp; bounce physics · landing distances form a face/edge/vertex mixture · "
     f"stateless · no data stored or transmitted."
     f"</p>"
     f"<hr style='border:none;border-top:1px solid rgba(124,110,245,0.22);margin:0 0 6px 0'>"
@@ -512,7 +512,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ---------------------------------------------------------------------------
 _section_header(
     "Convergence of Estimated σ̂ Across Replicates",
-    "When the running σ̂ (amber) flattens, the Rayleigh estimate has stabilized — more replicates won't change it meaningfully.",
+    "When the running σ̂ (amber) flattens, the MLE estimate has stabilized — more replicates won't change it meaningfully. σ̂ approximates the mixture spread, not a true Rayleigh parameter.",
 )
 
 repl_indices = np.arange(1, result.n_replicates + 1)
