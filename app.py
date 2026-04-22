@@ -306,16 +306,6 @@ if run_clicked:
 result: SimulationResult | None = st.session_state["result"]
 
 # ---------------------------------------------------------------------------
-# Info banner — shown only before first run
-# ---------------------------------------------------------------------------
-if not st.session_state["has_run"]:
-    st.info(
-        "Set table size and drop height, then click **▶ Run Simulation**. "
-        "Scatter spread is not an input — it is estimated from the physics of the drop "
-        "and computed from the simulation output."
-    )
-
-# ---------------------------------------------------------------------------
 # Hero header
 # ---------------------------------------------------------------------------
 st.markdown(
