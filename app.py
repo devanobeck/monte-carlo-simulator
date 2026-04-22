@@ -486,12 +486,13 @@ with col_right:
         line=dict(color=AMBER, width=2.5),
     ))
 
+    mean_all = float(result.distances.mean())
     fig_dist.add_vline(
-        x=result.mean_distance,
+        x=mean_all,
         line_dash="dash",
         line_color=TEXT,
         opacity=0.65,
-        annotation_text=f"Mean = {result.mean_distance:.2f} in",
+        annotation_text=f"Mean = {mean_all:.2f} in",
         annotation_font=dict(color=TEXT, size=11),
         annotation_position="top right",
     )
