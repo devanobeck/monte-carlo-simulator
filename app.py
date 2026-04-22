@@ -60,18 +60,18 @@ def _apply_layout(fig: go.Figure, *, height: int = 400,
 
 
 # ---------------------------------------------------------------------------
-# Tick helper (inches)
+# Tick helper (centimetres)
 # ---------------------------------------------------------------------------
-def _inch_ticks(grid_size: float) -> np.ndarray:
-    """Compute clean tick positions (in inches) for a grid of given side length."""
+def _cm_ticks(table_size_cm: float) -> np.ndarray:
+    """Compute clean tick positions (cm) for a square table of given side length."""
     nice_steps = [1, 2, 5, 10, 15, 20, 25, 50, 100]
-    target = grid_size / 5.0
+    target = table_size_cm / 5.0
     step = min(nice_steps, key=lambda s: abs(s - target))
     step = max(step, 1)
-    ticks = np.arange(0, grid_size + step, step)
-    ticks = ticks[ticks <= grid_size]
-    if ticks[-1] != grid_size:
-        ticks = np.append(ticks, grid_size)
+    ticks = np.arange(0, table_size_cm + step, step)
+    ticks = ticks[ticks <= table_size_cm]
+    if ticks[-1] != table_size_cm:
+        ticks = np.append(ticks, table_size_cm)
     return ticks
 
 
@@ -223,16 +223,31 @@ with st.sidebar:
     st.markdown("### ⚙️ Parameters")
     st.markdown("---")
 
-    grid_size = st.slider("Grid Size (inches)", min_value=10, max_value=200, value=50, step=1)
-    st.caption(f"Table: **{grid_size} × {grid_size} in** · σ auto = {grid_size * 0.15:.1f} in")
-    with st.expander("ℹ️ About Grid Size"):
+    table_size_cm = st.slider(
+        "Table Size (cm)",
+        min_value=20, max_value=150, value=30, step=5,
+        help="Physical width of the square table in centimeters. A standard dice tray is ~25–30 cm.",
+    )
+    st.caption(f"Table: **{table_size_cm} × {table_size_cm} cm** square.")
+    with st.expander("ℹ️ About Table Size"):
         st.markdown(
-            f"Sets the side length of the square table. At **{grid_size} in** the drop "
-            f"zone is a {grid_size}×{grid_size} inch square, drop point at center "
-            f"({grid_size/2:.0f}, {grid_size/2:.0f}). Scatter spread σ is auto-set to "
-            f"15% of this ({grid_size * 0.15:.1f} in), reflecting a d4's tetrahedral "
-            f"shape — no flat face means it arrests quickly and scatters less than "
-            f"rounder dice."
+            f"Sets the physical side length of the square table. At **{table_size_cm} cm** "
+            f"the drop zone is a {table_size_cm}×{table_size_cm} cm square with the drop "
+            f"point at center ({table_size_cm/2:.0f}, {table_size_cm/2:.0f}) cm. "
+            f"One grid cell = one centimetre exactly — no unit conversion is applied."
+        )
+
+    drop_height_cm = st.slider(
+        "Drop Height (cm)",
+        min_value=5, max_value=50, value=20, step=5,
+        help="How high above the table the dice are held before release. This is the only physical input — scatter is computed from it.",
+    )
+    st.caption("Scatter is not set by you — it emerges from the physics of the drop. Adjust height to see how it affects spread.")
+    with st.expander("ℹ️ About Drop Height"):
+        st.markdown(
+            "The only physical input you control. A higher drop means a longer fall time, "
+            "so the same small lateral release velocity produces a wider scatter on the table. "
+            "The simulation computes this exactly: σ ∝ √h."
         )
 
     st.markdown("---")
@@ -263,9 +278,6 @@ with st.sidebar:
             "20 dice × 10,000 replicates the simulation is always near-instant."
         )
 
-    # σ derived automatically — no slider shown
-    scatter_sigma = grid_size * 0.15
-
     st.markdown("---")
 
     fix_seed = st.checkbox("Fix random seed", value=False)
@@ -285,8 +297,8 @@ if run_clicked:
         st.session_state["result"] = run_simulation(
             n_dice=n_dice,
             n_replicates=n_replicates,
-            grid_size=float(grid_size),
-            scatter_sigma=scatter_sigma,
+            table_size_cm=float(table_size_cm),
+            drop_height_cm=float(drop_height_cm),
             seed=seed_val,
         )
     st.session_state["has_run"] = True
@@ -298,9 +310,9 @@ result: SimulationResult | None = st.session_state["result"]
 # ---------------------------------------------------------------------------
 if not st.session_state["has_run"]:
     st.info(
-        "Adjust the parameters in the sidebar and click **▶ Run Simulation** to begin. "
-        "Start with the defaults to get a feel for the controls, then try increasing "
-        "Grid Size or reducing Replicates to see how the distribution changes."
+        "Set table size and drop height, then click **▶ Run Simulation**. "
+        "Scatter spread is not an input — it is estimated from the physics of the drop "
+        "and computed from the simulation output."
     )
 
 # ---------------------------------------------------------------------------
@@ -311,9 +323,11 @@ st.markdown(
     f"<h1 style='color:{TEXT};font-family:Inter,sans-serif;font-size:2.1rem;"
     f"font-weight:700;margin:0;line-height:1.15'>🎲 Dice Drop Simulator</h1>"
     f"<p style='color:{MUTED};font-size:0.95rem;margin:6px 0 14px 0'>"
-    f"Drop <strong style='color:{TEXT}'>{n_dice}</strong> dice simultaneously, "
-    f"repeat <strong style='color:{TEXT}'>{n_replicates:,}</strong> times. "
-    f"Scatter is Gaussian · radial distances follow a Rayleigh distribution · "
+    f"Drop <strong style='color:{TEXT}'>{n_dice}</strong> dice from "
+    f"<strong style='color:{TEXT}'>{drop_height_cm} cm</strong>, "
+    f"repeat <strong style='color:{TEXT}'>{n_replicates:,}</strong> times on a "
+    f"<strong style='color:{TEXT}'>{table_size_cm}×{table_size_cm} cm</strong> table. "
+    f"Scatter emerges from fall physics · radial distances follow a Rayleigh distribution · "
     f"all computation runs locally."
     f"</p>"
     f"<hr style='border:none;border-top:1px solid rgba(124,110,245,0.22);margin:0 0 6px 0'>"
@@ -330,20 +344,25 @@ if result is None:
 off_table_count = int(result.total_landings - result.on_grid_mask.sum())
 
 cards_html = "".join([
-    _card("Total Landings",   f"{result.total_landings:,}"),
-    _card("Mean Distance",    f"{result.mean_distance:.2f}{_unit('in')}"),
-    _card("Std Dev",          f"{result.std_distance:.2f}{_unit('in')}"),
-    _card("% On Table",       f"{result.pct_on_grid:.1f}%",
+    _card("Estimated Scatter (σ̂)", f"{result.sigma_estimated_cm:.1f}{_unit('cm')}"),
+    _card("Theoretical σ",          f"{result.sigma_theoretical_cm:.1f}{_unit('cm')}"),
+    _card("Model Bias",             f"{result.sigma_bias_cm:+.2f}{_unit('cm')}"),
+    _card("Drop Height",            f"{result.drop_height_cm:.0f}{_unit('cm')}"),
+    _card("% On Table",             f"{result.pct_on_grid:.1f}%",
           _pct_badge(result.pct_on_grid)),
-    _card("Within 2σ",        f"{result.pct_within_2sigma:.1f}%",
+    _card("Within 2σ̂",             f"{result.pct_within_2sigma:.1f}%",
           _pct_badge(result.pct_within_2sigma)),
-    _card("Off Table",        f"{off_table_count:,}{_unit('dice')}"),
 ])
 
 st.markdown(
-    f"<div style='display:flex;gap:10px;margin:10px 0 28px 0'>{cards_html}</div>",
+    f"<div style='display:flex;gap:10px;margin:10px 0 8px 0'>{cards_html}</div>",
     unsafe_allow_html=True,
 )
+st.caption(
+    "Absolute values depend on the hand release noise constant in the model (estimated at 0.12 m/s). "
+    "What matters is how σ̂ changes as you adjust drop height — that trend is physically grounded."
+)
+st.markdown("<br>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # Section 3 — Heatmap + Radial distribution (two columns)
@@ -357,12 +376,12 @@ with col_left:
         "Each cell shows how many dice landed there across all replicates. Brighter = more dice.",
     )
 
-    gs = int(result.grid_size)
+    gs = int(result.table_size_cm)
     x_vals = np.arange(gs)
     y_vals = np.arange(gs)
-    center = result.grid_size / 2.0
+    center = result.table_size_cm / 2.0
     theta  = np.linspace(0, 2 * np.pi, 300)
-    ticks  = _inch_ticks(result.grid_size)
+    ticks  = _cm_ticks(result.table_size_cm)
     tick_labels = [str(int(v)) for v in ticks]
 
     fig_hm = go.Figure()
@@ -385,25 +404,25 @@ with col_left:
             len=0.85,
             outlinewidth=0,
         ),
-        hovertemplate="x: %{x} in<br>y: %{y} in<br>count: %{z}<extra></extra>",
+        hovertemplate="x: %{x} cm<br>y: %{y} cm<br>count: %{z}<extra></extra>",
     ))
 
-    # 1σ ring
+    # 1σ̂ ring
     fig_hm.add_trace(go.Scatter(
-        x=center + result.scatter_sigma * np.cos(theta),
-        y=center + result.scatter_sigma * np.sin(theta),
+        x=center + result.sigma_estimated_cm * np.cos(theta),
+        y=center + result.sigma_estimated_cm * np.sin(theta),
         mode="lines",
-        name="1σ",
+        name="1σ̂",
         line=dict(color=PRIMARY, dash="dash", width=1.8),
         opacity=0.85,
     ))
 
-    # 2σ ring
+    # 2σ̂ ring
     fig_hm.add_trace(go.Scatter(
-        x=center + 2 * result.scatter_sigma * np.cos(theta),
-        y=center + 2 * result.scatter_sigma * np.sin(theta),
+        x=center + 2 * result.sigma_estimated_cm * np.cos(theta),
+        y=center + 2 * result.sigma_estimated_cm * np.sin(theta),
         mode="lines",
-        name="2σ",
+        name="2σ̂",
         line=dict(color=AMBER, dash="dash", width=1.8),
         opacity=0.85,
     ))
@@ -424,9 +443,9 @@ with col_left:
     _apply_layout(
         fig_hm,
         height=420,
-        xtitle="X Position (in)",
-        ytitle="Y Position (in)",
-        chart_title=f"{result.n_dice} dice × {result.n_replicates:,} replicates",
+        xtitle="X Position (cm)",
+        ytitle="Y Position (cm)",
+        chart_title=f"{result.n_dice} dice × {result.n_replicates:,} replicates · {result.drop_height_cm:.0f} cm drop",
     )
     fig_hm.update_xaxes(tickvals=ticks, ticktext=tick_labels)
     fig_hm.update_yaxes(tickvals=ticks, ticktext=tick_labels, scaleanchor="x", scaleratio=1)
@@ -437,16 +456,17 @@ with col_left:
 with col_right:
     _section_header(
         "Radial Distance Distribution",
-        "How far each die traveled from center. Amber curve = theoretical Rayleigh prediction.",
+        "How far each die traveled from center. Amber curve = Rayleigh fit using estimated σ̂.",
     )
 
     x_max = result.distances.max() * 1.05
     x_pdf = np.linspace(0, x_max, 400)
-    y_pdf = rayleigh.pdf(x_pdf, scale=result.scatter_sigma)
+    # PDF uses sigma_estimated_cm converted to the cm axis directly
+    y_pdf = rayleigh.pdf(x_pdf, scale=result.sigma_estimated_cm)
 
-    # 1σ shading — filled polygon under Rayleigh curve
-    x_shade = np.linspace(0, result.scatter_sigma, 200)
-    y_shade = rayleigh.pdf(x_shade, scale=result.scatter_sigma)
+    # 1σ̂ shading — filled polygon under Rayleigh curve
+    x_shade = np.linspace(0, result.sigma_estimated_cm, 200)
+    y_shade = rayleigh.pdf(x_shade, scale=result.sigma_estimated_cm)
 
     fig_dist = go.Figure()
 
@@ -456,7 +476,7 @@ with col_right:
         fill="toself",
         fillcolor="rgba(124,110,245,0.10)",
         line=dict(color="rgba(0,0,0,0)"),
-        name="1σ zone",
+        name="1σ̂ zone",
         hoverinfo="skip",
     ))
 
@@ -467,13 +487,13 @@ with col_right:
         name="Observed",
         marker_color=PRIMARY,
         opacity=0.5,
-        hovertemplate="dist: %{x:.1f} in<br>density: %{y:.4f}<extra></extra>",
+        hovertemplate="dist: %{x:.1f} cm<br>density: %{y:.4f}<extra></extra>",
     ))
 
     fig_dist.add_trace(go.Scatter(
         x=x_pdf,
         y=y_pdf,
-        name=f"Rayleigh PDF (σ={result.scatter_sigma:.1f} in)",
+        name=f"Rayleigh fit (σ̂ = {result.sigma_estimated_cm:.1f} cm)",
         line=dict(color=AMBER, width=2.5),
     ))
 
@@ -482,7 +502,7 @@ with col_right:
         line_dash="dash",
         line_color=TEXT,
         opacity=0.65,
-        annotation_text=f"Mean = {result.mean_distance:.2f} in",
+        annotation_text=f"Mean = {result.mean_distance:.2f} cm",
         annotation_font=dict(color=TEXT, size=11),
         annotation_position="top right",
     )
@@ -490,7 +510,7 @@ with col_right:
     _apply_layout(
         fig_dist,
         height=420,
-        xtitle="Distance from Center (in)",
+        xtitle="Distance from Center (cm)",
         ytitle="Density",
     )
 
@@ -502,36 +522,39 @@ st.markdown("<br>", unsafe_allow_html=True)
 # Section 4 — Convergence plot (full width)
 # ---------------------------------------------------------------------------
 _section_header(
-    "Convergence of Mean Landing Distance",
-    "When the running mean (amber) flattens, the result has stabilized — more replicates won't change it meaningfully.",
+    "Convergence of Estimated σ̂ Across Replicates",
+    "When the running σ̂ (amber) flattens, the Rayleigh estimate has stabilized — more replicates won't change it meaningfully.",
 )
 
 repl_indices = np.arange(1, result.n_replicates + 1)
-running_mean = np.cumsum(result.per_replicate_mean_distances) / repl_indices
+
+# Per-replicate single-throw σ estimate (noisy raw signal)
+per_rep_d = result.distances.reshape(result.n_replicates, result.n_dice)
+per_rep_sigma_raw = np.sqrt((per_rep_d ** 2).mean(axis=1) / 2.0)
 
 fig_conv = go.Figure()
 
 fig_conv.add_trace(go.Scatter(
     x=repl_indices,
-    y=result.per_replicate_mean_distances,
-    name="Per-replicate mean",
+    y=per_rep_sigma_raw,
+    name="Single-replicate σ̂",
     line=dict(color=PRIMARY, width=1),
     opacity=0.3,
 ))
 
 fig_conv.add_trace(go.Scatter(
     x=repl_indices,
-    y=running_mean,
-    name="Running mean",
+    y=result.per_replicate_sigma,
+    name="Running σ̂ (MLE)",
     line=dict(color=AMBER, width=2.5),
 ))
 
 fig_conv.add_hline(
-    y=result.mean_distance,
+    y=result.sigma_theoretical_cm,
     line_dash="dash",
     line_color=TEXT,
     opacity=0.55,
-    annotation_text=f"Converged = {result.mean_distance:.2f} in",
+    annotation_text=f"Theoretical σ = {result.sigma_theoretical_cm:.2f} cm",
     annotation_font=dict(color=TEXT, size=11),
     annotation_position="right",
 )
@@ -540,7 +563,7 @@ _apply_layout(
     fig_conv,
     height=300,
     xtitle="Replicate #",
-    ytitle="Mean Distance from Center (in)",
+    ytitle="Estimated σ̂ (cm)",
 )
 
 st.plotly_chart(fig_conv, use_container_width=True)
@@ -589,13 +612,14 @@ with st.expander("🔍 Raw Scatter Plot (all individual drops)", expanded=False)
 
     fig_sc.add_shape(
         type="rect",
-        x0=0, y0=0, x1=result.grid_size, y1=result.grid_size,
+        x0=0, y0=0, x1=result.table_size_cm, y1=result.table_size_cm,
         line=dict(color=MUTED, dash="dash", width=1.5),
         fillcolor="rgba(0,0,0,0)",
     )
 
+    sc_center = result.table_size_cm / 2.0
     fig_sc.add_trace(go.Scatter(
-        x=[center], y=[center],
+        x=[sc_center], y=[sc_center],
         mode="markers",
         name="Drop point",
         marker=dict(symbol="cross", size=14, color=TEXT, line=dict(width=2.5, color=TEXT)),
@@ -604,8 +628,8 @@ with st.expander("🔍 Raw Scatter Plot (all individual drops)", expanded=False)
     _apply_layout(
         fig_sc,
         height=520,
-        xtitle="X Position (in)",
-        ytitle="Y Position (in)",
+        xtitle="X Position (cm)",
+        ytitle="Y Position (cm)",
         chart_title=f"Showing {subsample_n:,} of {total:,} total landings",
         square=True,
     )
