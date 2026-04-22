@@ -239,7 +239,7 @@ with st.sidebar:
 
     drop_height_in = st.slider(
         "Drop Height (in)",
-        min_value=2, max_value=20, value=8, step=1,
+        min_value=2, max_value=36, value=8, step=1,
         help="How high above the table the dice are held before release. This is the only physical input — scatter is computed from it.",
     )
     st.caption("Scatter is not set by you — it emerges from the physics of the drop. Adjust height to see how it affects spread.")
@@ -328,7 +328,7 @@ st.markdown(
     f"repeat <strong style='color:{TEXT}'>{n_replicates:,}</strong> times on a "
     f"<strong style='color:{TEXT}'>{table_size_in}×{table_size_in} in</strong> table. "
     f"Scatter emerges from fall physics · radial distances follow a Rayleigh distribution · "
-    f"all computation runs locally."
+    f"stateless · no data stored or transmitted."
     f"</p>"
     f"<hr style='border:none;border-top:1px solid rgba(124,110,245,0.22);margin:0 0 6px 0'>"
     f"</div>",
