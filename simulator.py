@@ -251,13 +251,45 @@ def run_simulation(
     positions = np.column_stack([center + total_dx_in, center + total_dy_in])
     distances = np.sqrt(total_dx_in ** 2 + total_dy_in ** 2)
 
-    # --- Theoretical σ: RMS combination of all three scatter sources ---
-    # Uses probability-weighted effective COR/MU to approximate the mixture.
-    sigma_clump_m  = CLUMP_RADIUS_M / 2
-    sigma_fall_m   = HAND_RELEASE_NOISE_MS * t_fall
-    sigma_bounce_m = MU_EFF * v_impact * (2 * COR_EFF / G) / (1 - COR_EFF)
+    # --- Corrected theoretical σ: exact variance propagation through the loop ---
+    #
+    # The total x-displacement decomposes as:
+    #   dx = clump_x  +  v_x*(t_fall + T_bounce)  +  Σ_j kick_j * T_tail_j
+    #
+    # where T_bounce = Σ_k E[t_air_k] and T_tail_j = Σ_{k≥j} E[t_air_k].
+    # All three terms are independent, so variances add directly.
+    #
+    # v_x is carried forward into every bounce (not just the fall), so its
+    # effective lever arm is (t_fall + T_bounce), not t_fall alone.
+    # kick_j is added at bounce j and then multiplied by t_air_k for all k ≥ j.
+    #
+    # EDGE_BIAS reduces per-axis kick variance for edge contacts:
+    #   Var(kx | edge) = kick_sigma² × [(1−EDGE_BIAS)² + EDGE_BIAS²/2]
+    # because the directed perpendicular component concentrates energy in one
+    # axis rather than spreading it isotropically.
+
+    COR_MEAN = float(np.mean([COR_FACE, COR_EDGE, COR_VERTEX]))   # matches loop decay
+
+    # Expected air time and vertical speed at each bounce k
+    t_air_theory = np.array([
+        2 * v_impact * (COR_MEAN ** k) * COR_EFF / G for k in range(n_bounces)
+    ])
+    v_vert_theory = np.array([v_impact * (COR_MEAN ** k) for k in range(n_bounces)])
+
+    T_bounce_total = t_air_theory.sum()
+    T_tail = np.array([t_air_theory[j:].sum() for j in range(n_bounces)])
+
+    # Probability-weighted mean-squared friction, edge-corrected
+    EDGE_FACTOR = (1 - EDGE_BIAS) ** 2 + EDGE_BIAS ** 2 / 2
+    MU_SQ_EFF = float(np.dot(CONTACT_PROBS,
+                             [MU_FACE ** 2, MU_EDGE ** 2 * EDGE_FACTOR, MU_VERTEX ** 2]))
+
+    sigma_clump_m = CLUMP_RADIUS_M / 2
+    sigma_vx_m    = HAND_RELEASE_NOISE_MS * (t_fall + T_bounce_total)
+    sigma_kicks_m = float(np.sqrt(np.sum(MU_SQ_EFF * v_vert_theory ** 2 * T_tail ** 2)))
+
     sigma_theoretical_in = float(
-        np.sqrt(sigma_clump_m ** 2 + sigma_fall_m ** 2 + sigma_bounce_m ** 2) / M_PER_IN
+        np.sqrt(sigma_clump_m ** 2 + sigma_vx_m ** 2 + sigma_kicks_m ** 2) / M_PER_IN
     )
 
     return SimulationResult(
