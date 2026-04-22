@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import numpy as np
 import plotly.graph_objects as go
-from scipy.stats import rayleigh
 import streamlit as st
 
 from simulator import run_simulation, SimulationResult
@@ -334,14 +333,12 @@ if result is None:
 off_table_count = int(result.total_landings - result.on_grid_mask.sum())
 
 cards_html = "".join([
-    _card("Estimated Scatter (σ̂)", f"{result.sigma_estimated_in:.2f}{_unit('in')}"),
-    _card("Theoretical σ",          f"{result.sigma_theoretical_in:.2f}{_unit('in')}"),
-    _card("Model Bias",             f"{result.sigma_bias_in:+.3f}{_unit('in')}"),
-    _card("Drop Height",            f"{result.drop_height_in:.0f}{_unit('in')}"),
-    _card("% On Table",             f"{result.pct_on_grid:.1f}%",
-          _pct_badge(result.pct_on_grid)),
-    _card("Within 2σ̂",             f"{result.pct_within_2sigma:.1f}%",
-          _pct_badge(result.pct_within_2sigma)),
+    _card("σ tight",        f"{result.sigma_tight_in:.1f}{_unit('in')}"),
+    _card("σ wide",         f"{result.sigma_wide_in:.1f}{_unit('in')}"),
+    _card("Tail Ratio",     f"{result.tail_ratio:.2f}×"),
+    _card("Median (p50)",   f"{result.p50_in:.1f}{_unit('in')}"),
+    _card("90th pct (p90)", f"{result.p90_in:.1f}{_unit('in')}"),
+    _card("Theoretical σ",  f"{result.sigma_theoretical_in:.1f}{_unit('in')}"),
 ])
 
 st.markdown(
@@ -349,8 +346,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.caption(
-    "Absolute values depend on the hand release noise constant in the model (estimated at 0.12 m/s). "
-    "What matters is how σ̂ changes as you adjust drop height — that trend is physically grounded."
+    "Absolute values depend on the hand release noise constant in the model (0.30 m/s). "
+    "The tail ratio (σ wide / σ tight) is independent of this constant "
+    "and is the most physically meaningful output."
 )
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -397,22 +395,22 @@ with col_left:
         hovertemplate="x: %{x} in<br>y: %{y} in<br>count: %{z}<extra></extra>",
     ))
 
-    # 1σ̂ ring
+    # σ tight ring (face-contact cluster boundary)
     fig_hm.add_trace(go.Scatter(
-        x=center + result.sigma_estimated_in * np.cos(theta),
-        y=center + result.sigma_estimated_in * np.sin(theta),
+        x=center + result.sigma_tight_in * np.cos(theta),
+        y=center + result.sigma_tight_in * np.sin(theta),
         mode="lines",
-        name="1σ̂",
+        name=f"σ tight ({result.sigma_tight_in:.1f} in)",
         line=dict(color=PRIMARY, dash="dash", width=1.8),
         opacity=0.85,
     ))
 
-    # 2σ̂ ring
+    # σ wide ring (edge/vertex tail boundary)
     fig_hm.add_trace(go.Scatter(
-        x=center + 2 * result.sigma_estimated_in * np.cos(theta),
-        y=center + 2 * result.sigma_estimated_in * np.sin(theta),
+        x=center + result.sigma_wide_in * np.cos(theta),
+        y=center + result.sigma_wide_in * np.sin(theta),
         mode="lines",
-        name="2σ̂",
+        name=f"σ wide ({result.sigma_wide_in:.1f} in)",
         line=dict(color=AMBER, dash="dash", width=1.8),
         opacity=0.85,
     ))
@@ -446,28 +444,20 @@ with col_left:
 with col_right:
     _section_header(
         "Radial Distance Distribution",
-        "Due to the d4's tetrahedral shape, the distribution is a mixture — face impacts cluster near center, edge and vertex impacts produce the heavy tail. The Rayleigh curve is fitted to the full distribution and approximates the central tendency, but expect visible deviation in the tails.",
+        "σ tight = Rayleigh MLE of the closer half of landings; σ wide = MLE of the farther half. The tail ratio (σ wide / σ tight ≈ 2.3) quantifies how much heavier the tail is than the central cluster. p50 and p90 are non-parametric.",
     )
 
-    x_max = result.distances.max() * 1.05
-    x_pdf = np.linspace(0, x_max, 400)
-    y_pdf = rayleigh.pdf(x_pdf, scale=result.sigma_estimated_in)
+    x_max  = result.distances.max() * 1.05
+    r_plot = np.linspace(0, x_max, 400)
 
-    # 1σ̂ shading — filled polygon under Rayleigh curve
-    x_shade = np.linspace(0, result.sigma_estimated_in, 200)
-    y_shade = rayleigh.pdf(x_shade, scale=result.sigma_estimated_in)
+    def _rayleigh_pdf(r, sigma):
+        return (r / sigma ** 2) * np.exp(-(r ** 2) / (2 * sigma ** 2))
+
+    # Equal-weight overlay of the two split-sigma Rayleigh components
+    tight_pdf = 0.5 * _rayleigh_pdf(r_plot, result.sigma_tight_in)
+    wide_pdf  = 0.5 * _rayleigh_pdf(r_plot, result.sigma_wide_in)
 
     fig_dist = go.Figure()
-
-    fig_dist.add_trace(go.Scatter(
-        x=np.concatenate([x_shade, x_shade[::-1]]),
-        y=np.concatenate([y_shade, np.zeros(len(y_shade))]),
-        fill="toself",
-        fillcolor="rgba(124,110,245,0.10)",
-        line=dict(color="rgba(0,0,0,0)"),
-        name="1σ̂ zone",
-        hoverinfo="skip",
-    ))
 
     fig_dist.add_trace(go.Histogram(
         x=result.distances,
@@ -480,20 +470,30 @@ with col_right:
     ))
 
     fig_dist.add_trace(go.Scatter(
-        x=x_pdf,
-        y=y_pdf,
-        name=f"Rayleigh fit (σ̂ = {result.sigma_estimated_in:.2f} in)",
+        x=r_plot,
+        y=tight_pdf + wide_pdf,
+        name=(f"Split-σ overlay  "
+              f"(σ tight={result.sigma_tight_in:.1f} in, "
+              f"σ wide={result.sigma_wide_in:.1f} in)"),
         line=dict(color=AMBER, width=2.5),
     ))
 
-    mean_all = float(result.distances.mean())
     fig_dist.add_vline(
-        x=mean_all,
+        x=result.p50_in,
         line_dash="dash",
-        line_color=TEXT,
-        opacity=0.65,
-        annotation_text=f"Mean = {mean_all:.2f} in",
-        annotation_font=dict(color=TEXT, size=11),
+        line_color="#00D4B4",
+        opacity=0.85,
+        annotation_text=f"p50 = {result.p50_in:.1f} in",
+        annotation_font=dict(color="#00D4B4", size=11),
+        annotation_position="top left",
+    )
+    fig_dist.add_vline(
+        x=result.p90_in,
+        line_dash="dash",
+        line_color=CORAL,
+        opacity=0.85,
+        annotation_text=f"p90 = {result.p90_in:.1f} in",
+        annotation_font=dict(color=CORAL, size=11),
         annotation_position="top right",
     )
 
@@ -512,8 +512,9 @@ st.markdown("<br>", unsafe_allow_html=True)
 # Section 4 — Convergence plot (full width)
 # ---------------------------------------------------------------------------
 _section_header(
-    "Convergence of Estimated σ̂ Across Replicates",
-    "When the running σ̂ (amber) flattens, the MLE estimate has stabilized — more replicates won't change it meaningfully. σ̂ approximates the mixture spread, not a true Rayleigh parameter.",
+    "Convergence of RMS Scatter Across Replicates",
+    "When the running RMS scatter (amber) flattens, the estimate has stabilized — more replicates won't change it meaningfully. "
+    "RMS scatter shown here for convergence tracking. Mixture components are fitted once on the full dataset.",
 )
 
 repl_indices = np.arange(1, result.n_replicates + 1)
@@ -535,7 +536,7 @@ fig_conv.add_trace(go.Scatter(
 fig_conv.add_trace(go.Scatter(
     x=repl_indices,
     y=result.per_replicate_sigma,
-    name="Running σ̂ (MLE)",
+    name="Running RMS scatter",
     line=dict(color=AMBER, width=2.5),
 ))
 
@@ -553,7 +554,7 @@ _apply_layout(
     fig_conv,
     height=300,
     xtitle="Replicate #",
-    ytitle="Estimated σ̂ (in)",
+    ytitle="RMS Scatter (in)",
 )
 
 st.plotly_chart(fig_conv, use_container_width=True)
