@@ -225,8 +225,8 @@ with st.sidebar:
 
     table_size_in = st.slider(
         "Table Size (in)",
-        min_value=8, max_value=60, value=12, step=2,
-        help="Physical width of the square table in inches. A standard dice tray is ~10–12 in.",
+        min_value=3, max_value=60, value=12, step=1,
+        help="Physical width of the square table in inches. A standard dice tray is ~10–12 in. Go small (3–6 in) to see how many dice fly off.",
     )
     st.caption(f"Table: **{table_size_in} × {table_size_in} in** square.")
     with st.expander("ℹ️ About Table Size"):
