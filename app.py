@@ -185,6 +185,7 @@ with st.sidebar:
     st.markdown("---")
 
     grid_size = st.slider("Grid Size (inches)", min_value=10, max_value=200, value=50, step=1)
+    st.caption("The size of the table in arbitrary units. Scatter spread scales with it automatically, keeping the physics consistent at any grid size.")
 
     n_dice = st.slider(
         "Dice Per Drop",
@@ -208,20 +209,10 @@ with st.sidebar:
 
     st.caption(f"**Total landings: {n_dice * n_replicates:,}**")
 
-    sigma_max = float(grid_size) / 2.0
-    sigma_default = float(grid_size) / 8.0
-    # Clamp default into valid range
-    sigma_default = max(1.0, min(sigma_default, sigma_max))
-
-    scatter_sigma = st.slider(
-        "Scatter Spread (σ)",
-        min_value=1.0,
-        max_value=sigma_max,
-        value=sigma_default,
-        step=0.5,
-        help="Controls how far dice scatter from the drop point. Distances follow a Rayleigh distribution with this σ.",
-    )
-    st.caption("How energetically the dice scatter from the drop point. A low σ means dice cluster tightly at center; a high σ means they spread wide.")
+    # scatter_sigma is derived automatically from grid_size.
+    # A d4's tetrahedral shape means it arrests quickly after landing and
+    # scatters less than rounder dice — 15% of grid_size captures this well.
+    scatter_sigma = grid_size * 0.15
 
     st.markdown("---")
     fix_seed = st.checkbox("Fix random seed", value=False)
