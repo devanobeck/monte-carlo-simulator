@@ -225,8 +225,8 @@ with st.sidebar:
 
     table_size_in = st.slider(
         "Table Size (in)",
-        min_value=3, max_value=60, value=12, step=1,
-        help="Physical width of the square table in inches. A standard dice tray is ~10–12 in. Go small (3–6 in) to see how many dice fly off.",
+        min_value=3, max_value=60, value=36, step=1,
+        help="Physical width of the square table in inches. Try 36 in (standard gaming mat section) or smaller to see dice fly off the edge.",
     )
     st.caption(f"Table: **{table_size_in} × {table_size_in} in** square.")
     with st.expander("ℹ️ About Table Size"):
@@ -239,7 +239,7 @@ with st.sidebar:
 
     drop_height_in = st.slider(
         "Drop Height (in)",
-        min_value=2, max_value=36, value=8, step=1,
+        min_value=2, max_value=36, value=4, step=1,
         help="How high above the table the dice are held before release. This is the only physical input — scatter is computed from it.",
     )
     st.caption("Scatter is not set by you — it emerges from the physics of the drop. Adjust height to see how it affects spread.")
