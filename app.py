@@ -446,7 +446,7 @@ with col_left:
 with col_right:
     _section_header(
         "Radial Distance Distribution",
-        "How far each die traveled from center. Amber curve = Rayleigh fit using estimated σ̂.",
+        "Due to the d4's tetrahedral shape, the distribution is a mixture — face impacts cluster near center, edge and vertex impacts produce the heavy tail. The Rayleigh curve is fitted to the full distribution and approximates the central tendency, but expect visible deviation in the tails.",
     )
 
     x_max = result.distances.max() * 1.05
