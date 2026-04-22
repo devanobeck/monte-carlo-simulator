@@ -185,7 +185,10 @@ with st.sidebar:
     st.markdown("---")
 
     grid_size = st.slider("Grid Size (inches)", min_value=10, max_value=200, value=50, step=1)
-    st.caption("The size of the table in arbitrary units. Scatter spread scales with it automatically, keeping the physics consistent at any grid size.")
+    st.caption(
+        f"The table is a **{grid_size} × {grid_size} inch** square. "
+        f"Scatter spread (σ) is automatically set to {grid_size * 0.15:.1f} in — 15% of the table size."
+    )
 
     n_dice = st.slider(
         "Dice Per Drop",
