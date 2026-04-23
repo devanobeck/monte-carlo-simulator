@@ -436,11 +436,18 @@ with col_left:
     )
     fig_hm.update_xaxes(tickvals=ticks, ticktext=tick_labels)
     fig_hm.update_yaxes(tickvals=ticks, ticktext=tick_labels, scaleanchor="x", scaleratio=1)
-    # Move legend to bottom-left — avoids overlap with colorbar on the right
-    fig_hm.update_layout(legend=dict(
-        x=0.01, y=0.01, xanchor="left", yanchor="bottom",
-        bgcolor="rgba(15,17,23,0.75)", bordercolor="rgba(255,255,255,0.12)", borderwidth=1,
-    ))
+    # Legend: top-right inside the plot area, well clear of the colorbar (which lives
+    # outside the plot in the right margin). Semi-transparent background keeps it readable.
+    fig_hm.update_layout(
+        legend=dict(
+            x=0.98, y=0.98, xanchor="right", yanchor="top",
+            bgcolor="rgba(15,17,23,0.82)",
+            bordercolor="rgba(255,255,255,0.18)",
+            borderwidth=1,
+            font=dict(size=11),
+        ),
+        margin=dict(l=48, r=80, t=44, b=44),
+    )
 
     st.plotly_chart(fig_hm, use_container_width=True)
 
@@ -482,7 +489,15 @@ with col_right:
         line=dict(color=AMBER, width=2.5),
     ))
 
-    # Average — top of chart, label to the right of the line
+    # Place average and "half land within" labels on opposite sides of their
+    # respective lines so text always points away from the other line.
+    if mean_all >= result.p50_in:
+        mean_pos = "top right"   # mean is rightmost → label extends further right
+        p50_pos  = "top left"    # p50 is leftmost  → label extends further left
+    else:
+        mean_pos = "top left"
+        p50_pos  = "top right"
+
     fig_dist.add_vline(
         x=mean_all,
         line_dash="dash",
@@ -490,22 +505,20 @@ with col_right:
         opacity=0.70,
         annotation_text=f"Average: {mean_all:.1f} in",
         annotation_font=dict(color=TEXT, size=11),
-        annotation_position="top right",
-        annotation_yshift=22,
+        annotation_position=mean_pos,
+        annotation_yshift=20,
     )
-    # Median (p50) — anchored at the bottom so it clears the average label
-    # (mean ≈ median, so both lines land at nearly the same x position)
     fig_dist.add_vline(
         x=result.p50_in,
         line_dash="dot",
         line_color="#00D4B4",
         opacity=0.85,
-        annotation_text=f"Median: {result.p50_in:.1f} in",
+        annotation_text=f"Half land within: {result.p50_in:.1f} in",
         annotation_font=dict(color="#00D4B4", size=11),
-        annotation_position="top right",
+        annotation_position=p50_pos,
         annotation_yshift=0,
     )
-    # 90th percentile — top right, well to the right of the other two
+    # 90th percentile — far enough right that it never collides with the above
     fig_dist.add_vline(
         x=result.p90_in,
         line_dash="dot",
@@ -514,7 +527,7 @@ with col_right:
         annotation_text=f"9 in 10 within: {result.p90_in:.1f} in",
         annotation_font=dict(color=CORAL, size=11),
         annotation_position="top right",
-        annotation_yshift=22,
+        annotation_yshift=20,
     )
 
     _apply_layout(
