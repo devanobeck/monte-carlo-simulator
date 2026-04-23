@@ -333,12 +333,12 @@ if result is None:
 off_table_count = int(result.total_landings - result.on_grid_mask.sum())
 
 cards_html = "".join([
-    _card("σ tight",        f"{result.sigma_tight_in:.1f}{_unit('in')}"),
-    _card("σ wide",         f"{result.sigma_wide_in:.1f}{_unit('in')}"),
-    _card("Tail Ratio",     f"{result.tail_ratio:.2f}×"),
-    _card("Median (p50)",   f"{result.p50_in:.1f}{_unit('in')}"),
-    _card("90th pct (p90)", f"{result.p90_in:.1f}{_unit('in')}"),
-    _card("Theoretical σ",  f"{result.sigma_theoretical_in:.1f}{_unit('in')}"),
+    _card("Typical spread",     f"{result.sigma_tight_in:.1f}{_unit('in')}"),
+    _card("Far-flier spread",   f"{result.sigma_wide_in:.1f}{_unit('in')}"),
+    _card("Far vs. typical",    f"{result.tail_ratio:.2f}×"),
+    _card("Half land within",   f"{result.p50_in:.1f}{_unit('in')}"),
+    _card("9 in 10 land within",f"{result.p90_in:.1f}{_unit('in')}"),
+    _card("Physics prediction", f"{result.sigma_theoretical_in:.1f}{_unit('in')}"),
 ])
 
 st.markdown(
@@ -346,9 +346,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.caption(
-    "Absolute values depend on the hand release noise constant in the model (0.30 m/s). "
-    "The tail ratio (σ wide / σ tight) is independent of this constant "
-    "and is the most physically meaningful output."
+    "Exact distances depend on how fast the hand moves at release — a model estimate. "
+    "The 'far vs. typical' ratio is independent of that estimate and is the most reliable output."
 )
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -395,22 +394,22 @@ with col_left:
         hovertemplate="x: %{x} in<br>y: %{y} in<br>count: %{z}<extra></extra>",
     ))
 
-    # σ tight ring (face-contact cluster boundary)
+    # Typical-spread ring
     fig_hm.add_trace(go.Scatter(
         x=center + result.sigma_tight_in * np.cos(theta),
         y=center + result.sigma_tight_in * np.sin(theta),
         mode="lines",
-        name=f"σ tight ({result.sigma_tight_in:.1f} in)",
+        name=f"Typical spread ({result.sigma_tight_in:.1f} in)",
         line=dict(color=PRIMARY, dash="dash", width=1.8),
         opacity=0.85,
     ))
 
-    # σ wide ring (edge/vertex tail boundary)
+    # Far-flier spread ring
     fig_hm.add_trace(go.Scatter(
         x=center + result.sigma_wide_in * np.cos(theta),
         y=center + result.sigma_wide_in * np.sin(theta),
         mode="lines",
-        name=f"σ wide ({result.sigma_wide_in:.1f} in)",
+        name=f"Far-flier spread ({result.sigma_wide_in:.1f} in)",
         line=dict(color=AMBER, dash="dash", width=1.8),
         opacity=0.85,
     ))
@@ -443,8 +442,9 @@ with col_left:
 # ── RIGHT: Radial Distance Distribution ─────────────────────────────────────
 with col_right:
     _section_header(
-        "Radial Distance Distribution",
-        "σ tight = Rayleigh MLE of the closer half of landings; σ wide = MLE of the farther half. The tail ratio (σ wide / σ tight ≈ 2.3) quantifies how much heavier the tail is than the central cluster. p50 and p90 are non-parametric.",
+        "How Far Do Dice Land?",
+        "Each bar shows how many dice landed at that distance from the drop point. "
+        "The curve is a smooth best fit. Dashed lines mark the average, median, and 90th percentile.",
     )
 
     x_max  = result.distances.max() * 1.05
@@ -453,9 +453,10 @@ with col_right:
     def _rayleigh_pdf(r, sigma):
         return (r / sigma ** 2) * np.exp(-(r ** 2) / (2 * sigma ** 2))
 
-    # Equal-weight overlay of the two split-sigma Rayleigh components
-    tight_pdf = 0.5 * _rayleigh_pdf(r_plot, result.sigma_tight_in)
-    wide_pdf  = 0.5 * _rayleigh_pdf(r_plot, result.sigma_wide_in)
+    # Best-fit curve using the full-dataset RMS (σ_rms is the MLE for all distances)
+    fit_pdf = _rayleigh_pdf(r_plot, result.sigma_rms_in)
+
+    mean_all = float(result.distances.mean())
 
     fig_dist = go.Figure()
 
@@ -463,7 +464,7 @@ with col_right:
         x=result.distances,
         histnorm="probability density",
         nbinsx=60,
-        name="Observed",
+        name="Observed landings",
         marker_color=PRIMARY,
         opacity=0.5,
         hovertemplate="dist: %{x:.2f} in<br>density: %{y:.4f}<extra></extra>",
@@ -471,28 +472,35 @@ with col_right:
 
     fig_dist.add_trace(go.Scatter(
         x=r_plot,
-        y=tight_pdf + wide_pdf,
-        name=(f"Split-σ overlay  "
-              f"(σ tight={result.sigma_tight_in:.1f} in, "
-              f"σ wide={result.sigma_wide_in:.1f} in)"),
+        y=fit_pdf,
+        name="Best-fit curve",
         line=dict(color=AMBER, width=2.5),
     ))
 
     fig_dist.add_vline(
-        x=result.p50_in,
+        x=mean_all,
         line_dash="dash",
+        line_color=TEXT,
+        opacity=0.70,
+        annotation_text=f"Average: {mean_all:.1f} in",
+        annotation_font=dict(color=TEXT, size=11),
+        annotation_position="top right",
+    )
+    fig_dist.add_vline(
+        x=result.p50_in,
+        line_dash="dot",
         line_color="#00D4B4",
         opacity=0.85,
-        annotation_text=f"p50 = {result.p50_in:.1f} in",
+        annotation_text=f"Half land within: {result.p50_in:.1f} in",
         annotation_font=dict(color="#00D4B4", size=11),
         annotation_position="top left",
     )
     fig_dist.add_vline(
         x=result.p90_in,
-        line_dash="dash",
+        line_dash="dot",
         line_color=CORAL,
         opacity=0.85,
-        annotation_text=f"p90 = {result.p90_in:.1f} in",
+        annotation_text=f"9 in 10 within: {result.p90_in:.1f} in",
         annotation_font=dict(color=CORAL, size=11),
         annotation_position="top right",
     )
@@ -512,9 +520,9 @@ st.markdown("<br>", unsafe_allow_html=True)
 # Section 4 — Convergence plot (full width)
 # ---------------------------------------------------------------------------
 _section_header(
-    "Convergence of RMS Scatter Across Replicates",
-    "When the running RMS scatter (amber) flattens, the estimate has stabilized — more replicates won't change it meaningfully. "
-    "RMS scatter shown here for convergence tracking. Mixture components are fitted once on the full dataset.",
+    "Did You Run Enough Throws?",
+    "When the amber line levels off, the result has stabilized — running more throws won't change it. "
+    "The faint lines show scatter from each individual throw; the amber line averages them all together.",
 )
 
 repl_indices = np.arange(1, result.n_replicates + 1)
@@ -528,7 +536,7 @@ fig_conv = go.Figure()
 fig_conv.add_trace(go.Scatter(
     x=repl_indices,
     y=per_rep_sigma_raw,
-    name="Single-replicate σ̂",
+    name="Each throw's scatter",
     line=dict(color=PRIMARY, width=1),
     opacity=0.3,
 ))
@@ -536,7 +544,7 @@ fig_conv.add_trace(go.Scatter(
 fig_conv.add_trace(go.Scatter(
     x=repl_indices,
     y=result.per_replicate_sigma,
-    name="Running RMS scatter",
+    name="Running average",
     line=dict(color=AMBER, width=2.5),
 ))
 
@@ -545,7 +553,7 @@ fig_conv.add_hline(
     line_dash="dash",
     line_color=TEXT,
     opacity=0.55,
-    annotation_text=f"Theoretical σ = {result.sigma_theoretical_in:.2f} in",
+    annotation_text=f"Physics prediction: {result.sigma_theoretical_in:.2f} in",
     annotation_font=dict(color=TEXT, size=11),
     annotation_position="right",
 )
@@ -553,8 +561,8 @@ fig_conv.add_hline(
 _apply_layout(
     fig_conv,
     height=300,
-    xtitle="Replicate #",
-    ytitle="RMS Scatter (in)",
+    xtitle="Throw #",
+    ytitle="Scatter (in)",
 )
 
 st.plotly_chart(fig_conv, use_container_width=True)
