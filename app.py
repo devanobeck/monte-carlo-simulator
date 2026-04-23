@@ -436,6 +436,11 @@ with col_left:
     )
     fig_hm.update_xaxes(tickvals=ticks, ticktext=tick_labels)
     fig_hm.update_yaxes(tickvals=ticks, ticktext=tick_labels, scaleanchor="x", scaleratio=1)
+    # Move legend to bottom-left — avoids overlap with colorbar on the right
+    fig_hm.update_layout(legend=dict(
+        x=0.01, y=0.01, xanchor="left", yanchor="bottom",
+        bgcolor="rgba(15,17,23,0.75)", bordercolor="rgba(255,255,255,0.12)", borderwidth=1,
+    ))
 
     st.plotly_chart(fig_hm, use_container_width=True)
 
@@ -444,7 +449,7 @@ with col_right:
     _section_header(
         "How Far Do Dice Land?",
         "Each bar shows how many dice landed at that distance from the drop point. "
-        "The curve is a smooth best fit. Dashed lines mark the average, median, and 90th percentile.",
+        "The curve is a smooth best fit. Lines mark the average, median, and the point where 9 in 10 dice have landed.",
     )
 
     x_max  = result.distances.max() * 1.05
@@ -477,6 +482,7 @@ with col_right:
         line=dict(color=AMBER, width=2.5),
     ))
 
+    # Average — top of chart, label to the right of the line
     fig_dist.add_vline(
         x=mean_all,
         line_dash="dash",
@@ -485,16 +491,21 @@ with col_right:
         annotation_text=f"Average: {mean_all:.1f} in",
         annotation_font=dict(color=TEXT, size=11),
         annotation_position="top right",
+        annotation_yshift=22,
     )
+    # Median (p50) — anchored at the bottom so it clears the average label
+    # (mean ≈ median, so both lines land at nearly the same x position)
     fig_dist.add_vline(
         x=result.p50_in,
         line_dash="dot",
         line_color="#00D4B4",
         opacity=0.85,
-        annotation_text=f"Half land within: {result.p50_in:.1f} in",
+        annotation_text=f"Median: {result.p50_in:.1f} in",
         annotation_font=dict(color="#00D4B4", size=11),
-        annotation_position="top left",
+        annotation_position="top right",
+        annotation_yshift=0,
     )
+    # 90th percentile — top right, well to the right of the other two
     fig_dist.add_vline(
         x=result.p90_in,
         line_dash="dot",
@@ -503,6 +514,7 @@ with col_right:
         annotation_text=f"9 in 10 within: {result.p90_in:.1f} in",
         annotation_font=dict(color=CORAL, size=11),
         annotation_position="top right",
+        annotation_yshift=22,
     )
 
     _apply_layout(
